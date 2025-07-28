@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Roulette with Bank and Bets</title>
+<style>
+  body {
+    font-family: sans-serif;
+    text-align: center;
+    background: #f2f2f2;
+  }
+  #roulette {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    margin: 20px auto;
+    border-radius: 50%;
+    border: 5px solid #333;
+    overflow: hidden;
+  }
+  canvas {
+    position: absolute;
+    top: 0; left: 0;
+  }
+  #ball {
+    width: 14px;
+    height: 14px;
+    background: white;
+    border: 2px solid #333;
+    border-radius: 50%;
+    position: absolute;
+    z-index: 10;
+    transition: left 0.5s ease, top 0.5s ease;
+  }
+  #pointer {
+    position: absolute;
+    top: -20px;
+    left: 140px;
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 20px solid red;
+    z-index: 20;
+  }
+  #controls {
+    margin-top: 20px;
+  }
+  label {
+    margin: 0 10px;
+  }
+  select {
+    font-size: 16px;
+  }
+  #result {
+    margin-top: 15px;
+    font-weight: bold;
+  }
+  #bank {
+    margin-top: 15px;
+    font-weight: bold;
+    font-size: 18px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Roulette with Bank and Bets</h1>
+
+<div id="roulette">
+  <canvas id="wheel" width="300" height="300"></canvas>
+  <div id="ball"></div>
+  <div id="pointer"></div>
+</div>
+
+<div id="controls">
+  <div>
+    <label>Bet on Color (100 points):
+      <select id="colorBet">
+        <option value="">-- none selected --</option>
+        <option value="red">Red</option>
+        <option value="black">Black</option>
+      </select>
+    </label>
+  </div>
+  <div style="margin-top:10px;">
+    <label>Bet on Number (100 points):
+      <select id="numberBet">
+        <option value="">-- none selected --</option>
+      </select>
+    </label>
+  </div>
+  <button id="spinBtn" style="margin-top:15px;">Place Bets & Spin</button>
+  <p id="result"></p>
+  <p id="bank">Bank: 3000 points</p>
+</div>
+
+<script>
+  const canvas = document.getElementById('wheel');
+  const ctx = canvas.getContext('2d');
+  const ball = document.getElementById('ball');
+  const spinBtn = document.getElementById('spinBtn');
+  const resultDiv = document.getElementById('result');
+  const bankDiv = document.getElementById('bank');
+  const colorBet = document.getElementById('colorBet');
+  const numberBet = document.getElementById('numberBet');
+
+  const numbers = [
+    0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6,
+    27, 13, 36, 11, 30, 8, 23, 10, 5, 24,
+    16, 33, 1, 20, 14, 31, 9, 22, 18, 29,
+    7, 28, 12, 35, 3, 26
+  ];
+  const redNumbers = new Set([32,19,21,25,34,27,36,30,23,5,16,1,14,9,18,7,12,3]);
+  const colors = numbers.map(n => n === 0 ? 'green' : (redNumbers.has(n) ? 'red' : 'black'));
+
+  const center = 150;
+  const radius = 150;
+  const sliceAngle = 360 / numbers.length;
+
+  function degToRad(deg) {
+    return deg * Math.PI / 180;
+  }
+
+  function drawWheel() {
+    ctx.clearRect(0, 0, 300, 300);
+    for(let i=0; i<numbers.length; i++) {
+      const startAngle = degToRad(i * sliceAngle - 90);
+      const endAngle = degToRad((i + 1) * sliceAngle - 90);
+
+      ctx.beginPath();
+      ctx.moveTo(center, center);
+      ctx.arc(center, center, radius, startAngle, endAngle);
+      ctx.closePath();
+
+      ctx.fillStyle = colors[i];
+      ctx.fill();
+      ctx.strokeStyle = '#000';
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(center, center);
+      const textAngle = (startAngle + endAngle) / 2;
+      ctx.rotate(textAngle);
+      ctx.fillStyle = 'white';
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(numbers[i], radius - 20, 5);
+      ctx.restore();
+    }
+  }
+  drawWheel();
+
+  // Fill number bet dropdown
+  for(let i=0; i<=36; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = i;
+    numberBet.appendChild(opt);
+  }
+
+  let bank = 3000;
+  const numberBetAmount = 100;
+  const colorBetAmount = 100;
+
+  function placeBallOnNumber(index) {
+    const angleDeg = index * sliceAngle + sliceAngle / 2 - 90;
+    const angleRad = degToRad(angleDeg);
+
+    const ballRadius = radius - 10;
+    const x = center + ballRadius * Math.cos(angleRad) - ball.offsetWidth / 2;
+    const y = center + ballRadius * Math.sin(angleRad) - ball.offsetHeight / 2;
+
+    ball.style.left = `${x}px`;
+    ball.style.top = `${y}px`;
+  }
+
+  spinBtn.addEventListener('click', () => {
+    const betNumberVal = numberBet.value ? parseInt(numberBet.value) : null;
+    const betColorVal = colorBet.value;
+
+    // Проверка на банк и выбранные ставки
+    let totalBet = 0;
+    if(betNumberVal !== null) totalBet += numberBetAmount;
+    if(betColorVal) totalBet += colorBetAmount;
+
+    if(totalBet === 0) {
+      alert('Please select at least one bet!');
+      return;
+    }
+    if(bank < totalBet) {
+      alert('Insufficient points in bank for these bets.');
+      return;
+    }
+
+    bank -= totalBet; // снимаем ставку
+    bankDiv.textContent = `Bank: ${bank} points`;
+    resultDiv.textContent = 'Spinning...';
+
+    spinBtn.disabled = true;
+
+    // Рандомный результат
+    const randomIndex = Math.floor(Math.random() * numbers.length);
+    placeBallOnNumber(randomIndex);
+
+    const num = numbers[randomIndex];
+    const col = colors[randomIndex];
+
+    // Вычисляем выигрыши
+    let winnings = 0;
+    let messages = [];
+
+    if(betNumberVal !== null && betNumberVal === num) {
+      winnings += 3600;
+      messages.push(`Number Bet Win! +3600 points`);
+    } else if(betNumberVal !== null) {
+      messages.push(`Number Bet Lose (-${numberBetAmount})`);
+    }
+
+    if(betColorVal && betColorVal === col) {
+      winnings += 200;
+      messages.push(`Color Bet Win! +200 points`);
+    } else if(betColorVal) {
+      messages.push(`Color Bet Lose (-${colorBetAmount})`);
+    }
+
+    bank += winnings;
+    bankDiv.textContent = `Bank: ${bank} points`;
+
+    setTimeout(() => {
+      resultDiv.innerHTML = `Result: ${num} (${col})<br>${messages.join('<br>')}`;
+      spinBtn.disabled = false;
+    }, 500); // немного задержки для плавности
+  });
+</script>
+
+</body>
+</html>
